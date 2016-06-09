@@ -1,13 +1,16 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 
+[ExecuteInEditMode]
 [RequireComponent(typeof(MeshFilter))]
 [RequireComponent(typeof(MeshRenderer))]
+[RequireComponent(typeof(MeshCollider))]
 public class TileMap : MonoBehaviour
 {
 
     public float Radius = 1;
     public float Height = 1;
+    public int StepCount = 4;
 
     public int DimX = 4;
     public int DimZ = 4;
@@ -15,13 +18,33 @@ public class TileMap : MonoBehaviour
     private const int ANGLE = 60;
     private const float MAGIC_NUMBER = 0.866025403f;
 
+    private MeshFilter _meshFilter;
+    private MeshCollider _meshCollider;
+
 	// Use this for initialization
 	void Start ()
 	{
+        _meshFilter = GetComponent<MeshFilter>();
+        _meshCollider = GetComponent<MeshCollider>();
 	    GenerateMesh();
 	}
 
-    void GenerateMesh()
+    void Update()
+    {
+        RaycastHit hitInfo;
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if(_meshCollider.Raycast(ray, out hitInfo, Mathf.Infinity))
+        {
+            int triangleIndex = hitInfo.triangleIndex;
+            int hexagonIndex = triangleIndex / 16;
+            int z = hexagonIndex % DimZ;
+            int x = hexagonIndex / DimZ;
+            Debug.Log(string.Format("{0}:, ({1}, {2})", hexagonIndex, x, z));
+
+        }
+    }
+
+    public void GenerateMesh()
     {
         List<Vector3> vertices = new List<Vector3>();
         List<int> triangles = new List<int>();
@@ -35,12 +58,14 @@ public class TileMap : MonoBehaviour
         {
             for(int z = 0; z < DimZ; ++z)
             {
-                center.y = Mathf.Pow(Mathf.PerlinNoise(seed + x / (float)DimX, seed + z/(float)DimZ) + 0.5f, 3) * Height;
+                float perlin = Mathf.Clamp01(Mathf.PerlinNoise(seed + x / (float)DimX, seed + z/(float)DimZ));
+                perlin = Step(perlin, StepCount, 0, 1);
+                center.y = perlin*Height;
                 Vector3[] tempVertices;
                 int[] tempTriangles;
                 Vector3[] tempNormals;
                 Vector2[] tempUvs;
-                CreateTileAround(center, out tempVertices, out tempTriangles, out tempNormals, out tempUvs);
+                CreateTileAround(center, out tempVertices, out tempTriangles, out tempNormals, out tempUvs, perlin - 1.0f/StepCount);
 
                 int trianglesOffset = vertices.Count;
                 vertices.AddRange(tempVertices);
@@ -72,11 +97,11 @@ public class TileMap : MonoBehaviour
         mesh.normals = normals.ToArray();
         mesh.uv = uvs.ToArray();
 
-        MeshFilter meshFilter = GetComponent<MeshFilter>();
-        meshFilter.mesh = mesh;
+        _meshFilter.mesh = mesh;
+        _meshCollider.sharedMesh = mesh;
     }
 
-    void CreateTileAround(Vector3 center, out Vector3[] vertices, out int[] triangles, out Vector3[] normals, out Vector2[] uvs)
+    void CreateTileAround(Vector3 center, out Vector3[] vertices, out int[] triangles, out Vector3[] normals, out Vector2[] uvs, float uvOffset)
     {
         vertices = new Vector3[6*3];
         triangles = new int[16*3];
@@ -117,27 +142,27 @@ public class TileMap : MonoBehaviour
         triangles[11] = 4;
 
         //Top Uv
-        uvs[0] = new Vector2(.25f,1.0f);
-        uvs[1] = new Vector2(0.5f, 0.75f);
-        uvs[2] = new Vector2(0.5f, 0.25f);
-        uvs[3] = new Vector2(0.25f, 0);
-        uvs[4] = new Vector2(0, 0.25f);
-        uvs[5] = new Vector2(0, 0.75f);
+        uvs[0] = new Vector2(.25f, uvOffset + 1.0f * 0.25f);
+        uvs[1] = new Vector2(0.5f, uvOffset +  0.75f * 0.25f);
+        uvs[2] = new Vector2(0.5f, uvOffset +  0.25f * 0.25f);
+        uvs[3] = new Vector2(0.25f, uvOffset +  0 * 0.25f);
+        uvs[4] = new Vector2(0, uvOffset +  0.25f* 0.25f);
+        uvs[5] = new Vector2(0, uvOffset +  0.75f * 0.25f);
 
         //Side Uvs
-        uvs[6] = new Vector2(0.5f, 1);
-        uvs[7] = new Vector2(1, 1);
-        uvs[8] =  new Vector2(0.5f, 1);
-        uvs[9] = new Vector2(1 ,1);
-        uvs[10] =  new Vector2(0.5f, 1);
-        uvs[11] = new Vector2(1, 1);
+        uvs[6] = new Vector2(0.5f, uvOffset + .25f);
+        uvs[7] = new Vector2(1, uvOffset + .25f);
+        uvs[8] =  new Vector2(0.5f, uvOffset + .25f);
+        uvs[9] = new Vector2(1 ,uvOffset + .25f);
+        uvs[10] =  new Vector2(0.5f, uvOffset + .25f);
+        uvs[11] = new Vector2(1, uvOffset + .25f);
 
-        uvs[12] = new Vector2(0.5f, 0);
-        uvs[13] = new Vector2(1, 0);
-        uvs[14] = new Vector2(.5f, 0);
-        uvs[15] = new Vector2(1, 0);
-        uvs[16] = new Vector2(0.5f, 0);
-        uvs[17] = new Vector2(1, 0);
+        uvs[12] = new Vector2(0.5f, uvOffset);
+        uvs[13] = new Vector2(1, uvOffset);
+        uvs[14] = new Vector2(.5f, uvOffset);
+        uvs[15] = new Vector2(1, uvOffset);
+        uvs[16] = new Vector2(0.5f, uvOffset);
+        uvs[17] = new Vector2(1, uvOffset);
 
         //Side wall
         for(int i = 0; i < 6; ++i)
@@ -150,5 +175,19 @@ public class TileMap : MonoBehaviour
             triangles[12 + 6*i + 4] = i + 12;
             triangles[12 + 6*i + 5] = (i + 1)%6 + 12;
         }
+    }
+
+
+    float Step(float input, int stepCount, float min, float max)
+    {
+        float step = (max - min)/stepCount;
+        float currentStep = min;
+
+        while(currentStep < input)
+        {
+            currentStep += step;
+        }
+        Debug.Log(currentStep);
+        return currentStep;
     }
 }

@@ -9,8 +9,10 @@
         "Temp":true,
         "Assets/Materials": true,
         "Assets/Prefabs": true,
-    "Assets/Scene": true,
+        "Assets/Scene": true,
         "Assets/Textures": true,
         "**/*.meta":true
-    }
+    },
+
+    "editor.insertSpaces": true
 }
