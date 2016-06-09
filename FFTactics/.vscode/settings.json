@@ -1,0 +1,16 @@
+//Workspace settings
+{
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.DS_Store": true,
+        "Library": true,
+        "ProjectSettings": true,
+        "Temp":true,
+        "Assets/Materials": true,
+        "Assets/Prefabs": true,
+    "Assets/Scene": true,
+        "Assets/Textures": true,
+        "**/*.meta":true
+    }
+}
