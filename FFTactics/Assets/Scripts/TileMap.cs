@@ -20,32 +20,52 @@ public class TileMap : MonoBehaviour
 
     private MeshFilter _meshFilter;
     private MeshCollider _meshCollider;
+    private bool _mouseDown = false;
+    public TileHighlighter TileHighlighter;
+
+    private Vector3[,] _tiles;
 
 	// Use this for initialization
 	void Start ()
 	{
         _meshFilter = GetComponent<MeshFilter>();
         _meshCollider = GetComponent<MeshCollider>();
+        if(TileHighlighter == null)
+            TileHighlighter = FindObjectOfType<TileHighlighter>();
 	    GenerateMesh();
 	}
 
     void Update()
     {
-        RaycastHit hitInfo;
-        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-        if(_meshCollider.Raycast(ray, out hitInfo, Mathf.Infinity))
+        if(Input.GetMouseButton(0) && !_mouseDown)
         {
-            int triangleIndex = hitInfo.triangleIndex;
-            int hexagonIndex = triangleIndex / 16;
-            int z = hexagonIndex % DimZ;
-            int x = hexagonIndex / DimZ;
-            Debug.Log(string.Format("{0}:, ({1}, {2})", hexagonIndex, x, z));
-
+            _mouseDown = true;
+            RaycastHit hitInfo;
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            if(_meshCollider.Raycast(ray, out hitInfo, Mathf.Infinity))
+            {
+                int triangleIndex = hitInfo.triangleIndex;
+                int hexagonIndex = triangleIndex / 16;
+                int z = hexagonIndex % DimZ;
+                int x = hexagonIndex / DimZ;
+                Debug.Log(string.Format("{0}:, ({1}, {2})", hexagonIndex, x, z));
+                Vector3[] cells = new Vector3[1];
+                cells[0] = _tiles[x,z];
+                TileHighlighter.HighlightCells(cells);
+            }
+        }
+        else if (Input.GetMouseButtonUp(0) && _mouseDown)
+        {
+            _mouseDown = false;
+            Vector3[] empty = new Vector3[0];
+            TileHighlighter.HighlightCells(empty);
         }
     }
 
     public void GenerateMesh()
     {
+        _tiles = new Vector3[DimX, DimZ];
+        float start = Time.realtimeSinceStartup;
         List<Vector3> vertices = new List<Vector3>();
         List<int> triangles = new List<int>();
         List<Vector3> normals = new List<Vector3>();
@@ -77,6 +97,7 @@ public class TileMap : MonoBehaviour
 
                 normals.AddRange(tempNormals);
                 uvs.AddRange(tempUvs);
+                _tiles[x,z] = center;
                 center += new Vector3(0, 0, 2*Radius*MAGIC_NUMBER);
             }
             center += xOffset;
@@ -92,13 +113,16 @@ public class TileMap : MonoBehaviour
 
 
         Mesh mesh = new Mesh();
-        mesh.vertices = vertices.ToArray();
-        mesh.triangles = triangles.ToArray();
-        mesh.normals = normals.ToArray();
-        mesh.uv = uvs.ToArray();
+       mesh.SetVertices(vertices);
+        mesh.SetTriangles(triangles, 0);
+        mesh.SetNormals(normals);
+        mesh.SetUVs(0, uvs);
 
         _meshFilter.mesh = mesh;
         _meshCollider.sharedMesh = mesh;
+
+        float time = Time.realtimeSinceStartup - start;
+        Debug.Log(string.Format("Generate mesh took: {0} seconds", time));
     }
 
     void CreateTileAround(Vector3 center, out Vector3[] vertices, out int[] triangles, out Vector3[] normals, out Vector2[] uvs, float uvOffset)
@@ -141,27 +165,31 @@ public class TileMap : MonoBehaviour
         triangles[10] = 3;
         triangles[11] = 4;
 
+        
+        float noise = Mathf.PerlinNoise(System.DateTime.Now.Second + center.x, System.DateTime.Now.Second + center.z) * 3;
+        float offset = Mathf.Floor(noise) / 4.0f;
+        Debug.Log(offset);
         //Top Uv
-        uvs[0] = new Vector2(.25f, uvOffset + 1.0f * 0.25f);
-        uvs[1] = new Vector2(0.5f, uvOffset +  0.75f * 0.25f);
-        uvs[2] = new Vector2(0.5f, uvOffset +  0.25f * 0.25f);
-        uvs[3] = new Vector2(0.25f, uvOffset +  0 * 0.25f);
-        uvs[4] = new Vector2(0, uvOffset +  0.25f* 0.25f);
-        uvs[5] = new Vector2(0, uvOffset +  0.75f * 0.25f);
+        uvs[0] = new Vector2(offset + .25f/4, uvOffset + 1.0f * 0.25f);
+        uvs[1] = new Vector2(offset + 0.5f/4, uvOffset +  0.75f * 0.25f);
+        uvs[2] = new Vector2(offset + 0.5f/4, uvOffset +  0.25f * 0.25f);
+        uvs[3] = new Vector2(offset + 0.25f/4, uvOffset +  0 * 0.25f);
+        uvs[4] = new Vector2(offset, uvOffset +  0.25f* 0.25f);
+        uvs[5] = new Vector2(offset, uvOffset +  0.75f * 0.25f);
 
         //Side Uvs
-        uvs[6] = new Vector2(0.5f, uvOffset + .25f);
+        uvs[6] = new Vector2(0.75f, uvOffset + .25f);
         uvs[7] = new Vector2(1, uvOffset + .25f);
-        uvs[8] =  new Vector2(0.5f, uvOffset + .25f);
+        uvs[8] =  new Vector2(0.75f, uvOffset + .25f);
         uvs[9] = new Vector2(1 ,uvOffset + .25f);
-        uvs[10] =  new Vector2(0.5f, uvOffset + .25f);
+        uvs[10] =  new Vector2(0.75f, uvOffset + .25f);
         uvs[11] = new Vector2(1, uvOffset + .25f);
 
-        uvs[12] = new Vector2(0.5f, uvOffset);
+        uvs[12] = new Vector2(0.75f, uvOffset);
         uvs[13] = new Vector2(1, uvOffset);
-        uvs[14] = new Vector2(.5f, uvOffset);
+        uvs[14] = new Vector2(.75f, uvOffset);
         uvs[15] = new Vector2(1, uvOffset);
-        uvs[16] = new Vector2(0.5f, uvOffset);
+        uvs[16] = new Vector2(0.75f, uvOffset);
         uvs[17] = new Vector2(1, uvOffset);
 
         //Side wall
@@ -177,7 +205,6 @@ public class TileMap : MonoBehaviour
         }
     }
 
-
     float Step(float input, int stepCount, float min, float max)
     {
         float step = (max - min)/stepCount;
@@ -187,7 +214,7 @@ public class TileMap : MonoBehaviour
         {
             currentStep += step;
         }
-        Debug.Log(currentStep);
+        //Debug.Log(currentStep);
         return currentStep;
     }
 }
